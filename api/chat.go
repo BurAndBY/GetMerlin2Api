@@ -76,11 +76,49 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
+func parseApiKey() (uuid, cookie string) {
+	apiKey := os.Getenv("APIKEY")
+	if apiKey == "" {
+		return "", ""
+	}
+	pairs := strings.Split(apiKey, ";")
+	for _, pair := range pairs {
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		if key == "uuid" {
+			uuid = value
+		} else if key == "cookie" {
+			cookie = value
+		}
+	}
+	return
+}
+
+func getUUID() string {
+	uuidVal, _ := parseApiKey()
+	if uuidVal != "" {
+		return uuidVal
+	}
+	return getEnvOrDefault("UUID", "")
+}
+
+func getAuthToken() string {
+	_, cookieVal := parseApiKey()
+	if cookieVal != "" {
+		return cookieVal
+	}
+	return getEnvOrDefault("AUTH_TOKEN", "")
+}
+
 func getToken() (string, error) {
 	tokenReq := struct {
 		UUID string `json:"uuid"`
 	}{
-		UUID: getEnvOrDefault("UUID", ""),
+		UUID: getUUID(),
 	}
 
 	tokenReqBody, _ := json.Marshal(tokenReq)
@@ -104,7 +142,7 @@ func getToken() (string, error) {
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	authToken := r.Header.Get("Authorization")
-	envToken := getEnvOrDefault("AUTH_TOKEN", "")
+	envToken := getAuthToken()
 
 	if envToken != "" && authToken != "Bearer "+envToken {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
